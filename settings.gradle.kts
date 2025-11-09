@@ -1,14 +1,4 @@
-pluginManagement {
-    repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-    }
-    plugins {
-        id("com.android.application") version "8.5.2"
-        kotlin("android") version "2.0.0"
-    }
-}
+import org.gradle.api.initialization.resolve.RepositoriesMode
 
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
