@@ -19,7 +19,15 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Use Gradle without wrapper
+      - name: Install Android SDK + Build-Tools
+        uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            platform-tools
+            platforms;android-34
+            build-tools;34.0.0
+
+      - name: Use Gradle (no wrapper)
         uses: gradle/gradle-build-action@v3
         with:
           gradle-version: 8.7
