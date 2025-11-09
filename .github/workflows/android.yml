@@ -19,13 +19,13 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Install Android SDK + Build-Tools
-        uses: android-actions/setup-android@v3
-        with:
-          packages: |
-            platform-tools
-            platforms;android-34
-            build-tools;34.0.0
+      - name: Setup Android SDK (Base)
+  uses: android-actions/setup-android@v3
+
+- name: Install required SDK packages
+  run: |
+    echo "y" | sdkmanager --licenses
+    sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
       - name: Use Gradle (no wrapper)
         uses: gradle/gradle-build-action@v3
