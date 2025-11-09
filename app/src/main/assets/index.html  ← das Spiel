@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>QR → Life</title>
+<style>
+  :root{--bg:#0b0f14;--fg:#e6eef8;--mut:#9bb0c9;--card:#121822;--grid:#1b2431}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial}
+  header{padding:10px 14px;border-bottom:1px solid #15202e;background:linear-gradient(180deg,#0e141e,#0b0f14)}
+  h1{font-size:18px;margin:0}
+  main{display:grid;grid-template-columns:380px 1fr;gap:12px;max-width:1500px;margin:0 auto;padding:12px}
+  @media (max-width: 1000px){main{grid-template-columns:1fr}}
+  .panel{background:#121822;border:1px solid #162234;border-radius:16px;padding:12px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+  label{font-size:12px;color:var(--mut)}
+  input[type="range"]{width:160px}
+  button, select, input[type="number"]{background:#172235;color:var(--fg);border:1px solid #223248;border-radius:10px;padding:6px 10px;cursor:pointer}
+  button.primary{background:linear-gradient(180deg,#1e3a5f,#18314f);border-color:#2a4a6a}
+  button:disabled{opacity:.6;cursor:not-allowed}
+  canvas{background:#000;border-radius:16px;border:1px solid #162234;display:block;width:100%;height:auto}
+  video{width:100%;border-radius:12px;border:1px solid #162234;background:#000}
+  .hint{color:var(--mut);font-size:12px}
+  .pill{display:inline-flex;gap:6px;align-items:center;background:#0f1a2a;border:1px solid #2a3d57;border-radius:999px;padding:6px 10px;font-size:12px}
+  .unlock{background:#0f2a18;border:1px solid #2e6a45}
+</style>
+</head>
+<body>
+  <header><h1>QR → Life (Kamera + Regeln + Editor)</h1></header>
+  <main>
+    <section class="panel">
+      <h3>Quelle</h3>
+      <div class="row">
+        <button id="camStart">🎥 Kamera starten</button>
+        <button id="camSnap" disabled>📸 Frame übernehmen</button>
+        <input id="file" type="file" accept="image/*">
+      </div>
+      <video id="cam" playsinline muted></video>
+
+      <h3>Vorverarbeitung</h3>
+      <div class="row">
+        <label>Downscale <span id="scaleVal">4</span>x</label>
+        <input id="scale" type="range" min="1" max="24" value="4">
+        <label>Schwellwert <span id="thVal">140</span></label>
+        <input id="th" type="range" min="0" max="255" value="140">
+        <label><input id="invert" type="checkbox"> Invertieren (schwarz=lebendig)</label>
+      </div>
+      <div class="row">
+        <label><input id="protectFinder" type="checkbox" checked> QR-Finder-Ecken schützen</label>
+        <label>Raster-Vergrößerung</label>
+        <select id="gridScale">
+          <option>1</option><option>2</option><option>3</option><option>4</option>
+        </select>
+      </div>
+      <div class="row">
+        <button id="build" class="primary">➡️ Quelle → Gitter übernehmen</button>
+      </div>
+
+      <h3>Regeln</h3>
+      <div class="row">
+        <label>Regel</label><input id="rule" value="B3/S23" style="width:110px">
+        <label>Preset</label>
+        <select id="preset">
+          <option value="B3/S23">Conway</option>
+          <option value="B36/S23">HighLife</option>
+          <option value="B2/S">Seeds</option>
+          <option value="B3678/S34678">Day&Night</option>
+        </select>
+        <button id="applyRule">Übernehmen</button>
+      </div>
+
+      <h3>Simulation</h3>
+      <div class="row">
+        <label>Zellgröße</label><input id="cellSize" type="number" value="4" min="1" max="20" style="width:70px">
+        <label>Geschwindigkeit</label><input id="tickRange" type="range" min="50" max="2000" step="50" value="1000">
+        <span class="hint">Tick: <b id="tickVal">1000 ms</b> (≈ <span id="tickFps">1</span>/s)</span>
+        <label><input id="endless" type="checkbox"> Endloslauf</label>
+      </div>
+      <div class="row">
+        <button id="start" disabled>▶️ Start</button>
+        <button id="pause" disabled>⏯️ Pause</button>
+        <button id="step" disabled>⏭️ 1 Schritt</button>
+        <button id="stop" disabled>⏹️ Stop</button>
+        <button id="clear">🧹 Reset</button>
+      </div>
+
+      <h3>Editor</h3>
+      <div class="row">
+        <label><input id="editMode" type="checkbox"> Edit-Modus</label>
+        <label><input id="liveEdit" type="checkbox"> Live-Edit während Lauf</label>
+        <label>Werkzeug</label><select id="tool"><option value="pen">Stift</option><option value="eraser">Radierer</option></select>
+        <label>Pinselgröße</label><input id="brush" type="number" value="1" min="1" max="20" style="width:70px">
+        <label><input id="showGrid" type="checkbox" checked> Rasterlinien</label>
+      </div>
+
+      <div class="row">
+        <span class="pill">Glider: <b id="gliderCount">0</b></span>
+        <span class="pill unlock" id="unlockMsg" style="display:none">🔓 Unlock!</span>
+      </div>
+
+      <h3>Monetarisierung</h3>
+      <div class="row">
+        <button id="premium">🔒 Premium freischalten</button>
+        <button id="reward">🎁 Belohnungs-Ad ansehen</button>
+        <span class="hint" id="premiumState">Premium: false</span>
+      </div>
+
+      <p id="status" class="hint">Bereit.</p>
+    </section>
+
+    <section class="panel">
+      <canvas id="view" width="900" height="900"></canvas>
+    </section>
+  </main>
+
+<script>
+(() => {
+  // DOM refs
+  const camStart=document.getElementById('camStart'), camSnap=document.getElementById('camSnap'), cam=document.getElementById('cam'), file=document.getElementById('file');
+  const scale=document.getElementById('scale'), scaleVal=document.getElementById('scaleVal'), th=document.getElementById('th'), thVal=document.getElementById('thVal'), invert=document.getElementById('invert');
+  const protectFinder=document.getElementById('protectFinder'), gridScaleSel=document.getElementById('gridScale'), buildBtn=document.getElementById('build');
+  const ruleInput=document.getElementById('rule'), preset=document.getElementById('preset'), applyRule=document.getElementById('applyRule');
+  const cellSize=document.getElementById('cellSize'), tickRange=document.getElementById('tickRange'), tickVal=document.getElementById('tickVal'), tickFps=document.getElementById('tickFps'), endless=document.getElementById('endless');
+  const startBtn=document.getElementById('start'), pauseBtn=document.getElementById('pause'), stepBtn=document.getElementById('step'), stopBtn=document.getElementById('stop'), clearBtn=document.getElementById('clear');
+  const editMode=document.getElementById('editMode'), liveEdit=document.getElementById('liveEdit'), toolSel=document.getElementById('tool'), brushInput=document.getElementById('brush'), showGrid=document.getElementById('showGrid');
+  const gliderCountEl=document.getElementById('gliderCount'), unlockMsg=document.getElementById('unlockMsg'), premiumBtn=document.getElementById('premium'), rewardBtn=document.getElementById('reward'), premiumState=document.getElementById('premiumState');
+  const status=document.getElementById('status'), view=document.getElementById('view'), vctx=view.getContext('2d');
+
+  // state
+  let srcImg=new Image(), stream=null, grid=null, cols=0, rows=0, frozenMask=null;
+  let raf=null, running=false, accum=0, last=0, gliderCount=0;
+  let birth=new Set([3]), surv=new Set([2,3]);
+
+  const tmpCanvas=document.createElement('canvas'); const tctx=tmpCanvas.getContext('2d',{willReadFrequently:true});
+  function setStatus(m){ status.textContent=m; }
+
+  // rules
+  function parseRule(str){ const m=str.toUpperCase().match(/^B([0-8]*)\/S([0-8]*)$/); if(!m) return null; return {b:new Set([...m[1]].map(d=>+d)), s:new Set([...m[2]].map(d=>+d))}; }
+  function applyRuleString(str){ const r=parseRule(str); if(!r){ setStatus('Ungültige Regel'); return; } birth=r.b; surv=r.s; ruleInput.value=str; setStatus('Regel: '+str); }
+  preset.addEventListener('change', ()=>applyRuleString(preset.value)); applyRule.addEventListener('click', ()=>applyRuleString(ruleInput.value));
+  scale.addEventListener('input', ()=>scaleVal.textContent=scale.value); th.addEventListener('input', ()=>thVal.textContent=th.value);
+
+  // camera
+  camStart.addEventListener('click', async ()=>{ try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}); cam.srcObject=stream; await cam.play(); camSnap.disabled=true; // erst nach load erlauben
+    setTimeout(()=>{ camSnap.disabled=false; },400); setStatus('Kamera bereit. Frame übernehmen → Quelle→Gitter.');
+  }catch(e){ setStatus('Kamera nicht verfügbar: '+e); }});
+  camSnap.addEventListener('click', ()=>{ if(!cam.videoWidth) return; tmpCanvas.width=cam.videoWidth; tmpCanvas.height=cam.videoHeight; tctx.drawImage(cam,0,0); srcImg.src=tmpCanvas.toDataURL('image/png'); setStatus('Frame übernommen.'); });
+  file.addEventListener('change', e=>{ const f=e.target.files?.[0]; if(!f) return; const url=URL.createObjectURL(f); srcImg.onload=()=>{ URL.revokeObjectURL(url); setStatus('Bild geladen.'); }; srcImg.src=url; });
+
+  // build grid
+  function buildGridFromImage(){
+    if(!srcImg.width){ setStatus('Erst Kamera/Bild.'); return; }
+    const s=Math.max(1,parseInt(scale.value,10)), inv=invert.checked, thr=parseInt(th.value,10);
+    const baseW=Math.max(1,(srcImg.width/s)|0), baseH=Math.max(1,(srcImg.height/s)|0);
+    tmpCanvas.width=baseW; tmpCanvas.height=baseH; tctx.imageSmoothingEnabled=false; tctx.clearRect(0,0,baseW,baseH); tctx.drawImage(srcImg,0,0,baseW,baseH);
+    const data=tctx.getImageData(0,0,baseW,baseH).data; cols=baseW; rows=baseH; grid=new Uint8Array(cols*rows); let alive=0;
+    for(let y=0;y<rows;y++){ for(let x=0;x<cols;x++){ const i=y*cols+x,j=i*4; const lum=0.2126*data[j]+0.7152*data[j+1]+0.0722*data[j+2]; const on=inv?(lum<thr):(lum>thr); grid[i]=on?1:0; if(on) alive++; } }
+    const mul=Math.max(1,parseInt(gridScaleSel.value||'1',10));
+    if(mul>1){ const ncols=cols*mul,nrows=rows*mul, up=new Uint8Array(ncols*nrows);
+      for(let y=0;y<rows;y++) for(let x=0;x<cols;x++) if(grid[y*cols+x]) for(let dy=0;dy<mul;dy++){ const yy=y*mul+dy,rowOff=yy*ncols; for(let dx=0;dx<mul;dx++) up[rowOff+(x*mul+dx)]=1; }
+      cols=ncols; rows=nrows; grid=up;
+    }
+    frozenMask=new Uint8Array(cols*rows); if(protectFinder.checked){ const qw=(cols/6)|0,qh=(rows/6)|0; for(let y=0;y<qh;y++) for(let x=0;x<qw;x++) frozenMask[y*cols+x]=1; for(let y=0;y<qh;y++) for(let x=cols-qw;x<cols;x++) frozenMask[y*cols+x]=1; for(let y=rows-qh;y<rows;y++) for(let x=0;x<qw;x++) frozenMask[y*cols+x]=1; }
+    setStatus(`Gitter: ${cols}×${rows}, lebendig: ${alive}.`); draw(); startBtn.disabled=pauseBtn.disabled=stepBtn.disabled=stopBtn.disabled=false;
+  }
+  buildBtn.addEventListener('click', buildGridFromImage);
+
+  // life core
+  const idx=(x,y)=>y*cols+x;
+  const neighbors=(x,y)=>{ let n=0; for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){ if(dx||dy){ const xx=x+dx,yy=y+dy; if(xx>=0&&yy>=0&&xx<cols&&yy<rows) n+=grid[idx(xx,yy)]; } } return n; }
+  function stepLife(){ const next=new Uint8Array(cols*rows); let changed=0; for(let y=0;y<rows;y++) for(let x=0;x<cols;x++){ const i=idx(x,y),a=grid[i],nb=neighbors(x,y); let v=a; v=a?(surv.has(nb)?1:0):(birth.has(nb)?1:0); if(frozenMask&&frozenMask[i]) v=a; next[i]=v; if(v!==a) changed++; } grid=next; return {changed}; }
+
+  function draw(){ if(!grid) return; const size=Math.max(1,parseInt(cellSize.value,10)); const w=cols*size,h=rows*size; view.width=w; view.height=h;
+    vctx.fillStyle='#000'; vctx.fillRect(0,0,w,h); vctx.fillStyle='#d9e6f7';
+    for(let y=0;y<rows;y++) for(let x=0;x<cols;x++) if(grid[idx(x,y)]) vctx.fillRect(x*size,y*size,size,size);
+    if(showGrid.checked && size>=4){ vctx.globalAlpha=.25; vctx.strokeStyle='#5a6b86'; vctx.lineWidth=1; vctx.beginPath(); for(let x=0;x<=cols;x++){ const px=x*size+.5; vctx.moveTo(px,0); vctx.lineTo(px,h); } for(let y=0;y<=rows;y++){ const py=y*size+.5; vctx.moveTo(0,py); vctx.lineTo(w,py); } vctx.stroke(); vctx.globalAlpha=1; }
+  }
+
+  // glider detect (simple)
+  const GLIDERS=[[[1,0],[2,1],[0,2],[1,2],[2,2]],[[0,0],[0,1],[1,1],[1,2],[2,1]],[[0,0],[1,0],[2,0],[0,1],[1,2]],[[0,1],[1,2],[2,2],[2,1],[1,0]]];
+  function detectGlider(){ let found=0; for(let y=0;y<rows-2;y++) for(let x=0;x<cols-2;x++){ for(const shape of GLIDERS){ let ok=true; for(const [dx,dy] of shape){ if(!grid[idx(x+dx,y+dy)]){ ok=false; break; } } if(ok) found++; } } return found; }
+
+  function tickMs(){ return Math.max(50, parseInt(tickRange.value,10)); }
+  function updateTickLabel(){ const ms=tickMs(); tickVal.textContent=ms+' ms'; tickFps.textContent=Math.round(1000/ms); }
+  tickRange.addEventListener('input', updateTickLabel); updateTickLabel();
+
+  function loop(ts){ if(!running) return; if(!last) last=ts; const dt=ts-last; last=ts; accum+=dt; const t=tickMs();
+    if(accum>=t){ const {changed}=stepLife(); draw(); accum=0; const g=detectGlider(); if(g>0){ gliderCount+=g; gliderCountEl.textContent=gliderCount; onUnlock('glider',gliderCount); }
+      if(changed===0 && !endless.checked){ running=false; startBtn.textContent='▶️ Start'; setStatus('Stillstand.'); return; } }
+    raf=requestAnimationFrame(loop);
+  }
+
+  startBtn.addEventListener('click', ()=>{ if(!grid){ setStatus('Erst Gitter aufbauen.'); return; } if(running) return; running=true; last=0; accum=0; requestAnimationFrame(loop); setStatus('Läuft…'); });
+  pauseBtn.addEventListener('click', ()=>{ if(!grid) return; if(running){ running=false; setStatus('Pausiert.'); } else { running=true; last=0; accum=0; requestAnimationFrame(loop); setStatus('Läuft…'); } });
+  stepBtn.addEventListener('click', ()=>{ if(!grid) return; const {changed}=stepLife(); draw(); setStatus(changed?'Schritt.':'Keine Änderung.'); });
+  stopBtn.addEventListener('click', ()=>{ running=false; setStatus('Gestoppt.'); });
+  clearBtn.addEventListener('click', ()=>{ running=false; grid=null; cols=rows=0; vctx.clearRect(0,0,view.width,view.height); setStatus('Bereit.'); });
+
+  // editor
+  let painting=false; function setCell(x,y,val){ if(x>=0&&y>=0&&x<cols&&y<rows) grid[idx(x,y)]=val; }
+  function paintAtClient(cx,cy){ if(!grid) return; const rect=view.getBoundingClientRect(), size=Math.max(1,parseInt(cellSize.value,10)); const gx=((cx-rect.left)/size)|0, gy=((cy-rect.top)/size)|0;
+    const val=(toolSel.value==='pen')?1:0, r=Math.max(1,parseInt(brushInput.value,10)); for(let dy=-r+1;dy<r;dy++) for(let dx=-r+1;dx<r;dx++) if(Math.abs(dx)+Math.abs(dy)<r) setCell(gx+dx,gy+dy,val); draw(); }
+  editMode.addEventListener('change', ()=>{ if(editMode.checked){ running=false; setStatus('Edit-Modus.'); } });
+  view.addEventListener('pointerdown', e=>{ if(!(editMode.checked||liveEdit.checked)) return; painting=true; view.setPointerCapture(e.pointerId); paintAtClient(e.clientX,e.clientY); });
+  view.addEventListener('pointermove', e=>{ if(!(editMode.checked||liveEdit.checked) || !painting) return; paintAtClient(e.clientX,e.clientY); });
+  view.addEventListener('pointerup', e=>{ painting=false; view.releasePointerCapture(e.pointerId); });
+  view.addEventListener('pointer
