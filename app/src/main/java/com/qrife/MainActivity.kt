@@ -14,11 +14,10 @@ class MainActivity : AppCompatActivity() {
         web.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
         setContentView(web)
 
-        // 1) Test: zeigt Text -> App startet sicher
-        web.loadData("<h2 style='font-family:sans-serif'>QR Life läuft ✅</h2>",
-            "text/html","utf-8")
-
-        // Wenn das läuft, nächste APK bauen und danach diese Zeile aktivieren:
-        // web.loadUrl("file:///android_asset/index.html")
+        // Test-Seite: zeigt nur Text – wenn das erscheint, startet die App korrekt.
+        web.loadData(
+            "<h2 style='font-family:sans-serif'>QR Life läuft ✅</h2>",
+            "text/html","utf-8"
+        )
     }
 }
